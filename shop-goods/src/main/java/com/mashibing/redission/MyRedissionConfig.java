@@ -12,6 +12,7 @@ public class MyRedissionConfig {
     public RedissonClient redisson(){
         //1、创建配置
         Config config = new Config();
+        config.setLockWatchdogTimeout(3000);
         config.useSingleServer().setAddress("redis://localhost:6379");
         //2、根据config配置创建出RedissonClient的实例
         RedissonClient redissonClient= Redisson.create(config);

@@ -41,6 +41,8 @@ public class GoodsServiceImpl {
     //Redis分布式锁
     @Autowired
     private RedisDistLock redisDistLock;
+    @Autowired
+    private RedissonClient redissonClient;
 
     //Zookeeper分布式锁
     @Autowired
@@ -54,20 +56,32 @@ public class GoodsServiceImpl {
 
         //多个应用，分布式部署，这里需要使用分布式锁类解决问题
     public   int updateGoods(long orderId, long goodsId, int goodsNumber){
-        synchronized (this){
-            if(lock ==null){ //多线程安全问题
-                lock =  new InterProcessMutex(curatorFramework,"/locks");
-                logger.info("生成一个zk锁对象");
-            }
-        }
+//        synchronized (this){
+//            if(lock ==null){ //多线程安全问题
+//                lock =  new InterProcessMutex(curatorFramework,"/locks");
+//                logger.info("生成一个zk锁对象");
+//            }
+//        }
+        RLock rLock;
+//        synchronized (this) {
+            rLock = redissonClient.getLock("lock");
+//        }
         int ireturn =-1;
         try{
-            redisDistLock.lock();
-           //zookeeper实现的分布式锁（临时、序号节点，包括监听机制）
+            rLock.lock();
+//            rLock.lock(5000, TimeUnit.SECONDS);
+            logger.info("获取锁时间{}", System.currentTimeMillis());
+//            Thread.sleep(4000);
+//            rLock.tryLock(5000, TimeUnit.SECONDS);
+//            rLock.tryLock(10, 100, TimeUnit.SECONDS);
+
+//                Thread.sleep(100);
+                logger.info("业务结束时间{}", System.currentTimeMillis());
+                //zookeeper实现的分布式锁（临时、序号节点，包括监听机制）
 //            if(lock.acquire(90, TimeUnit.SECONDS)){
-            ShopGoods shopGoods = new ShopGoods();
-            shopGoods.setGoodsId(goodsId);
-            shopGoods.setGoodsNumber(goodsNumber);
+                ShopGoods shopGoods = new ShopGoods();
+                shopGoods.setGoodsId(goodsId);
+                shopGoods.setGoodsNumber(goodsNumber);
                 if(shopGoodsMapper.updateByPrimaryKey(shopGoods)>=0){
                     //logger.info("修改库存成功：[" + orderId + "]");
                     ireturn =1;
@@ -81,13 +95,15 @@ public class GoodsServiceImpl {
         }catch (Exception e) {
             e.printStackTrace();
         }finally {
-            redisDistLock.unlock();
+//            redisDistLock.unlock();
 //            try {
 //                lock.release(); //释放锁
 //                logger.error("释放zk分布式锁");
 //            } catch (Exception e) {
 //                e.printStackTrace();
 //            }
+            logger.info("解锁时间{}", System.currentTimeMillis());
+            rLock.unlock();
             return ireturn;
         }
     }
